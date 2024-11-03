@@ -29,7 +29,7 @@ function authenticateUser($username, $password) {
 // Topic Management Functions
 function createTopic($creator, $title, $description) {
     $file = 'topics.txt';
-    $id = count(file($file)) + 1;
+    $id = count(file($file)) + 1; // Consider checking if the file is empty for an accurate ID
     file_put_contents($file, "$id|$creator|$title|$description\n", FILE_APPEND);
     return true;
 }
@@ -40,7 +40,15 @@ function getTopics() {
     $lines = file($file, FILE_IGNORE_NEW_LINES);
 
     foreach ($lines as $line) {
-        list($id, $creator, $title, $description) = explode("|", $line);
+        $parts = explode("|", $line);
+        
+        // Check if we have enough parts
+        if (count($parts) < 4) {
+            error_log("Malformed topic line: $line");
+            continue; // Skip malformed lines
+        }
+        
+        list($id, $creator, $title, $description) = $parts;
         $topics[] = ['id' => $id, 'creator' => $creator, 'title' => $title, 'description' => $description];
     }
     return $topics;
@@ -89,7 +97,11 @@ function getUserVotingHistory($username) {
         list($voter, $topicID, $voteType) = explode("|", $vote);
         if ($voter == $username) {
             $topicDetails = getTopicById($topicID);
-            $history[] = ['title' => $topicDetails['title'], 'voteType' => $voteType];
+            if ($topicDetails) { // Check if topicDetails is not null
+                $history[] = ['title' => $topicDetails['title'], 'voteType' => $voteType];
+            } else {
+                error_log("Topic with ID $topicID not found for user $username");
+            }
         }
     }
     return $history;
@@ -100,9 +112,16 @@ function getTopicById($topicID) {
     $lines = file($file, FILE_IGNORE_NEW_LINES);
 
     foreach ($lines as $line) {
-        list($id, $creator, $title, $description) = explode("|", $line);
-        if ($id == $topicID) {
-            return ['id' => $id, 'creator' => $creator, 'title' => $title, 'description' => $description];
+        $data = explode("|", $line);
+
+        // Check that we have exactly 4 parts
+        if (count($data) === 4) {
+            list($id, $creator, $title, $description) = $data;
+            if ($id == $topicID) {
+                return ['id' => $id, 'creator' => $creator, 'title' => $title, 'description' => $description];
+            }
+        } else {
+            error_log("Invalid topic line: $line");
         }
     }
     return null; // Return null if the topic ID is not found
@@ -114,8 +133,13 @@ function getTotalTopicsCreated($username) {
     $count = 0;
     
     foreach ($topics as $topic) {
-        list($id, $creator) = explode("|", $topic);
-        if ($creator == $username) $count++;
+        $data = explode("|", $topic);
+        if (count($data) === 4) { // Ensure correct format
+            list($id, $creator) = $data;
+            if ($creator == $username) $count++;
+        } else {
+            error_log("Malformed topic line: $topic");
+        }
     }
     return $count;
 }
@@ -126,8 +150,13 @@ function getTotalVotesCast($username) {
     $count = 0;
     
     foreach ($votes as $vote) {
-        list($voter) = explode("|", $vote);
-        if ($voter == $username) $count++;
+        $data = explode("|", $vote);
+        if (count($data) === 3) { // Ensure correct format
+            list($voter) = $data;
+            if ($voter == $username) $count++;
+        } else {
+            error_log("Malformed vote line: $vote");
+        }
     }
     return $count;
 }
@@ -148,5 +177,3 @@ function setTheme($theme) {
 function getTheme() {
     return $_COOKIE['theme'] ?? 'light';
 }
-
-show_source(__FILE__);

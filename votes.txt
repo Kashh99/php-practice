@@ -1,0 +1,3 @@
+admin01|1|up
+admin01||up
+admin01|3|down
